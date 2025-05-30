@@ -35,7 +35,7 @@ I’ve gotten a few 99s with this already and thought I’d upload it here in ca
 5. Put your mouse where you want the script to click (like the obstacle or the knight).
 6. Run the script.
 7. Set your hotkey in the GUI (default: CapsLock).
-8. Mess with the humanization sliders if you want.
+8. Adjust the humanization sliders and inputs if you want.
 9. Press your hotkey to start/stop.
 
 **Tip:**  
@@ -45,14 +45,38 @@ Start the script with your mouse already over the thing you want to click. It’
 
 ## Humanization Settings Explained
 
-- **Randomness:**  
-  Higher means more random timing and position (feels more human).
-- **Error Rate:**  
-  How often it purposely messes up (misses or double-clicks).
-- **Fatigue Drift:**  
-  Makes the mouse drift a bit, like if your hand was getting tired.
+This script tries to act like a real person, not a robot. The settings below help you fine-tune how “human” your clicks look and feel:
 
-The script also takes random breaks (5–15 seconds every 1–3 minutes) and shows you when the next break is.
+- **Randomness**  
+  *How much the click timing and position varies.*  
+  - **Low value:** Clicks are nearly the same every time (robotic).
+  - **High value:** Clicks are more unpredictable (like a distracted or tired human).
+
+- **Error Rate**  
+  *How often the script intentionally makes mistakes, like missing the target or double-clicking.*  
+  - **0:** Never messes up.
+  - **Higher values:** Sometimes clicks the wrong spot, double-clicks, or pauses awkwardly—just like a real player zoning out or misclicking.
+
+- **Fatigue Drift**  
+  *Simulates your hand getting tired and drifting off target over time.*  
+  - **Low value:** Mouse stays on target.
+  - **High value:** Mouse drifts more, like your hand is getting lazy or tired after a while.
+
+- **Click Speed (% slower)**  
+  *Makes every click take longer, as if you’re getting tired or distracted.*  
+  - **0%:** Original (fastest) speed.
+  - **100%:** Twice as slow as the original speed.
+  - **Tip:** If you want to play it safe, use a higher value for less “bot-like” clicking.
+
+- **Breaks**  
+  The script will automatically take random breaks (5–15 seconds every 1–3 minutes) to mimic a real person pausing for a drink, a stretch, or to answer a message.
+
+---
+
+### Recommended Settings
+
+- For **maximum safety**: Use higher randomness, a small error rate, and some fatigue drift. Set click speed to at least 20–30% slower than default.
+- For **maximum speed**: Lower randomness, error, and fatigue, and keep click speed at 0%. (But this is more bot-like and riskier!)
 
 ---
 
