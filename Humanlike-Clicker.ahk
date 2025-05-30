@@ -8,6 +8,9 @@ global HumanErrorRate := 8
 global FatigueLevel := 0
 global FatigueDriftRadius := 10
 global RandomnessLevel := 50
+global ClickSpeedPercent := 1.0  ; 1.0 = normal, 2.0 = 100% slower (twice as slow)
+global MinRuntime := 0
+global MaxRuntime := 0
 global DarkMode := false
 global ClickCount := 0
 global SessionStart := 0
@@ -15,7 +18,10 @@ global SessionEnd := 0
 
 global MyGui, StartButton, StopButton
 global RandomnessSlider, HumanErrorSlider, FatigueSlider
-global StatText, TimeText, NextBreakText, TotalRunText
+global RandomnessEdit, HumanErrorEdit, FatigueEdit
+global ClickSpeedSlider, ClickSpeedEdit
+global MinRuntimeSlider, MaxRuntimeSlider, MinRuntimeEdit, MaxRuntimeEdit
+global StatText, TimeText, NextBreakText, TotalRunText, RuntimeLimitsText
 global Hotkey1Ctrl
 global Hotkey1 := "CapsLock"
 global prevHotkey1 := ""
@@ -25,10 +31,17 @@ global FixedY := 0
 global TotalRunTime := 0
 global NextBreakTime := 0
 
+global ClickingRhythm := 0
+global RhythmDuration := 0
+global RhythmProgress := 0
+
 CreateGui() {
     global GuiCreated, MyGui, StartButton, StopButton
     global RandomnessSlider, HumanErrorSlider, FatigueSlider
-    global StatText, TimeText, Hotkey1Ctrl, NextBreakText, TotalRunText
+    global RandomnessEdit, HumanErrorEdit, FatigueEdit
+    global ClickSpeedSlider, ClickSpeedEdit
+    global MinRuntimeSlider, MaxRuntimeSlider, MinRuntimeEdit, MaxRuntimeEdit
+    global StatText, TimeText, Hotkey1Ctrl, NextBreakText, TotalRunText, RuntimeLimitsText
 
     if (GuiCreated)
         return
@@ -52,25 +65,58 @@ CreateGui() {
     SetHotkeysBtn := MyGui.Add("Button", "x200 y75 w40 h20", "Set")
     SetHotkeysBtn.OnEvent("Click", SetCustomHotkeys)
 
-    ; Humanization - improved section
-    MyGui.Add("GroupBox", "x10 y120 w350 h140", "Humanization Settings")
+    ; Humanization & Timing
+    MyGui.Add("GroupBox", "x10 y120 w350 h230", "Humanization & Timing")
+
     MyGui.Add("Text", "x25 y145 w120 h20", "Randomness (1-100):")
-    RandomnessSlider := MyGui.Add("Slider", "x150 y145 w160 h20 Range1-100", 50)
+    RandomnessSlider := MyGui.Add("Slider", "x150 y145 w120 h20 Range1-100", 50)
+    RandomnessEdit := MyGui.Add("Edit", "x280 y145 w40 h20 Number", "50")
+    RandomnessSlider.OnEvent("Change", (*) => RandomnessEdit.Value := RandomnessSlider.Value)
+    RandomnessEdit.OnEvent("Change", (*) => RandomnessSlider.Value := Clamp(RandomnessEdit.Value, 1, 100))
+
     MyGui.Add("Text", "x25 y175 w120 h20", "Error Rate (0-20):")
-    HumanErrorSlider := MyGui.Add("Slider", "x150 y175 w160 h20 Range0-20", 8)
+    HumanErrorSlider := MyGui.Add("Slider", "x150 y175 w120 h20 Range0-20", 8)
+    HumanErrorEdit := MyGui.Add("Edit", "x280 y175 w40 h20 Number", "8")
+    HumanErrorSlider.OnEvent("Change", (*) => HumanErrorEdit.Value := HumanErrorSlider.Value)
+    HumanErrorEdit.OnEvent("Change", (*) => HumanErrorSlider.Value := Clamp(HumanErrorEdit.Value, 0, 20))
+
     MyGui.Add("Text", "x25 y205 w120 h20", "Fatigue Drift (1-30):")
-    FatigueSlider := MyGui.Add("Slider", "x150 y205 w160 h20 Range1-30", 10)
-    MyGui.Add("Text", "x25 y235 w300 h40", "Adjust these to simulate human-like clicking. " 
-        . "Higher randomness and error rate increase variability. Fatigue affects click precision.")
+    FatigueSlider := MyGui.Add("Slider", "x150 y205 w120 h20 Range1-30", 10)
+    FatigueEdit := MyGui.Add("Edit", "x280 y205 w40 h20 Number", "10")
+    FatigueSlider.OnEvent("Change", (*) => FatigueEdit.Value := FatigueSlider.Value)
+    FatigueEdit.OnEvent("Change", (*) => FatigueSlider.Value := Clamp(FatigueEdit.Value, 1, 30))
+
+    MyGui.Add("Text", "x25 y235 w120 h20", "Click Speed (% slower):")
+    ClickSpeedSlider := MyGui.Add("Slider", "x150 y235 w120 h20 Range0-100", 0)
+    ClickSpeedEdit := MyGui.Add("Edit", "x280 y235 w40 h20 Number", "0")
+    ClickSpeedSlider.OnEvent("Change", (*) => ClickSpeedEdit.Value := ClickSpeedSlider.Value)
+    ClickSpeedEdit.OnEvent("Change", (*) => ClickSpeedSlider.Value := Clamp(ClickSpeedEdit.Value, 0, 100))
+
+    ; Runtime in MINUTES
+    MyGui.Add("Text", "x25 y265 w120 h20", "Min Runtime (min):")
+    MinRuntimeSlider := MyGui.Add("Slider", "x150 y265 w120 h20 Range0-60", 0)
+    MinRuntimeEdit := MyGui.Add("Edit", "x280 y265 w40 h20 Number", "0")
+    MinRuntimeSlider.OnEvent("Change", (*) => MinRuntimeEdit.Value := MinRuntimeSlider.Value)
+    MinRuntimeEdit.OnEvent("Change", (*) => MinRuntimeSlider.Value := Clamp(MinRuntimeEdit.Value, 0, 60))
+
+    MyGui.Add("Text", "x25 y295 w120 h20", "Max Runtime (min):")
+    MaxRuntimeSlider := MyGui.Add("Slider", "x150 y295 w120 h20 Range0-60", 0)
+    MaxRuntimeEdit := MyGui.Add("Edit", "x280 y295 w40 h20 Number", "0")
+    MaxRuntimeSlider.OnEvent("Change", (*) => MaxRuntimeEdit.Value := MaxRuntimeSlider.Value)
+    MaxRuntimeEdit.OnEvent("Change", (*) => MaxRuntimeSlider.Value := Clamp(MaxRuntimeEdit.Value, 0, 60))
+
+    MyGui.Add("Text", "x25 y325 w320 h40", "Randomness: More = less robotic. Error Rate: More = more mistakes. Fatigue: More = more drift. Click Speed: Higher = slower.")
+
+    RuntimeLimitsText := MyGui.Add("Text", "x25 y370 w320 h20", "Set min/max run time (0 = off) for the 6 hour force log")
 
     ; Stats
-    MyGui.Add("GroupBox", "x10 y340 w350 h120", "Stats")
-    StatText := MyGui.Add("Text", "x25 y365 w320 h20", "Not started.")
-    TimeText := MyGui.Add("Text", "x25 y390 w320 h20")
-    TotalRunText := MyGui.Add("Text", "x25 y415 w320 h20", "Total run time: 0s")
-    NextBreakText := MyGui.Add("Text", "x25 y440 w320 h20", "Next break: N/A")
+    MyGui.Add("GroupBox", "x10 y400 w350 h120", "Stats")
+    StatText := MyGui.Add("Text", "x25 y425 w320 h20", "Not started.")
+    TimeText := MyGui.Add("Text", "x25 y450 w320 h20")
+    TotalRunText := MyGui.Add("Text", "x25 y475 w320 h20", "Total run time: 0s")
+    NextBreakText := MyGui.Add("Text", "x25 y500 w320 h20", "Next break: N/A")
 
-    MyGui.Show("w370 h470")
+    MyGui.Show("w370 h540")
     GuiCreated := true
     StopButton.Enabled := false
     SetCustomHotkeys()
@@ -88,10 +134,21 @@ ToggleMode(*) {
     }
 }
 
+Clamp(val, min, max) {
+    val := Floor(val)
+    if val < min
+        return min
+    if val > max
+        return max
+    return val
+}
+
 StartSession(*) {
     global IsRunning, ClickCount, SessionStart, SessionEnd
-    global RandomnessSlider, HumanErrorSlider, FatigueSlider, StartButton, StopButton
+    global RandomnessSlider, HumanErrorSlider, FatigueSlider, ClickSpeedSlider
+    global MinRuntimeSlider, MaxRuntimeSlider, StartButton, StopButton
     global FixedX, FixedY, NextBreakTime, TotalRunTime
+    global ClickingRhythm, RhythmDuration, RhythmProgress
 
     if (IsRunning)
         return
@@ -103,6 +160,11 @@ StartSession(*) {
     SessionEnd := 0
     NextBreakTime := RandomInt(60, 180) ; Next break between 1-3 minutes
     TotalRunTime := 0
+
+    ; Reset rhythm for humanized click speed
+    ClickingRhythm := RandomInt(0, 5)
+    RhythmDuration := RandomInt(8, 22)
+    RhythmProgress := 0
 
     StartButton.Enabled := false
     StopButton.Enabled := true
@@ -125,10 +187,12 @@ StopSession(*) {
 }
 
 ClickLoop() {
-    global IsRunning, RandomnessSlider, HumanErrorSlider, FatigueSlider
+    global IsRunning, RandomnessSlider, HumanErrorSlider, FatigueSlider, ClickSpeedSlider
+    global MinRuntimeSlider, MaxRuntimeSlider
     global FatigueLevel, ClickCount
-    global RandomnessLevel, HumanErrorRate, FatigueDriftRadius
-    global FixedX, FixedY, NextBreakTime
+    global RandomnessLevel, HumanErrorRate, FatigueDriftRadius, ClickSpeedPercent, MinRuntime, MaxRuntime
+    global FixedX, FixedY, NextBreakTime, SessionStart
+    global ClickingRhythm, RhythmDuration, RhythmProgress
 
     if (!IsRunning)
         return
@@ -136,6 +200,17 @@ ClickLoop() {
     RandomnessLevel := RandomnessSlider.Value
     HumanErrorRate := HumanErrorSlider.Value
     FatigueDriftRadius := FatigueSlider.Value
+    ClickSpeedPercent := 1 + (ClickSpeedSlider.Value / 100)
+    MinRuntime := MinRuntimeSlider.Value * 60 ; convert to seconds
+    MaxRuntime := MaxRuntimeSlider.Value * 60 ; convert to seconds
+
+    elapsed := (A_TickCount - SessionStart) // 1000
+
+    ; Stop if max runtime reached (if set)
+    if (MaxRuntime > 0 && elapsed >= MaxRuntime) {
+        StopSession()
+        return
+    }
 
     ; Always click in a small region around the original starting point
     x1 := FixedX - 10
@@ -180,8 +255,8 @@ ClickLoop() {
     if (RandomInt(1, 100) < 10 + FatigueLevel // 10)
         Sleep(500 + RandomnessLevel * 2)
 
-    delay := Gaussian(200, 80 + RandomnessLevel)
-    SetTimer(ClickLoop, -Max(delay, 50))
+    ; Use original script's humanized delay, then apply the click speed percent (slower)
+    delay := GetHumanDelay() * ClickSpeedPercent
 
     ; Handle break logic
     global NextBreakTime
@@ -192,6 +267,46 @@ ClickLoop() {
             NextBreakTime := RandomInt(60, 180)
         }
     }
+
+    SetTimer(ClickLoop, -Max(delay, 50))
+}
+
+GetHumanDelay() {
+    global ClickingRhythm, RhythmDuration, RhythmProgress, FatigueLevel
+
+    BaseClickDelay := 150
+    FatigueEffect := 1.0 + (FatigueLevel * 0.01)
+    AdjustedBaseDelay := BaseClickDelay * FatigueEffect
+
+    RhythmProgress++
+    if (RhythmProgress >= RhythmDuration) {
+        ClickingRhythm := RandomInt(0, 5)
+        RhythmDuration := RandomInt(8, 22)
+        RhythmProgress := 0
+    }
+
+    if (ClickingRhythm == 0) {
+        Delay := RandomInt(AdjustedBaseDelay * 0.8, AdjustedBaseDelay * 1.3)
+    } else if (ClickingRhythm == 1) {
+        Delay := RandomInt(AdjustedBaseDelay * 0.7, AdjustedBaseDelay * 1.1)
+    } else if (ClickingRhythm == 2) {
+        Delay := RandomInt(AdjustedBaseDelay * 1.2, AdjustedBaseDelay * 2.2)
+    } else if (ClickingRhythm == 3) {
+        Delay := RandomInt(AdjustedBaseDelay * 0.5, AdjustedBaseDelay * 3.0)
+    } else if (ClickingRhythm == 4) {
+        if (Mod(RhythmProgress, 3) == 0) {
+            Delay := RandomInt(AdjustedBaseDelay * 0.4, AdjustedBaseDelay * 0.7)
+        } else {
+            Delay := RandomInt(AdjustedBaseDelay * 1.5, AdjustedBaseDelay * 2.5)
+        }
+    } else {
+        if (Mod(RhythmProgress, 7) == 0) {
+            Delay := RandomInt(AdjustedBaseDelay * 2.5, AdjustedBaseDelay * 4.0)
+        } else {
+            Delay := RandomInt(AdjustedBaseDelay * 0.9, AdjustedBaseDelay * 1.1)
+        }
+    }
+    return Round(Delay)
 }
 
 MoveBezier(x2, y2, cx1, cy1, cx2, cy2) {
@@ -221,11 +336,12 @@ Gaussian(mean, stddev) {
     return Floor(mean + stddev * rand1)
 }
 
-RandomInt(min, max) => Random(min, max)
+RandomInt(min, max) => Round(Random(min, max))
 
 UpdateStats() {
     global ClickCount, SessionStart, SessionEnd, IsRunning, StatText, TimeText
     global TotalRunTime, NextBreakTime, NextBreakText, TotalRunText
+    global MinRuntimeSlider, MaxRuntimeSlider
 
     if (IsRunning) {
         elapsed := (A_TickCount - SessionStart) // 1000
@@ -238,6 +354,17 @@ UpdateStats() {
         } else {
             NextBreakText.Value := "No break scheduled"
         }
+        minr := MinRuntimeSlider.Value
+        maxr := MaxRuntimeSlider.Value
+        txt := ""
+        if minr > 0
+            txt .= "Min: " minr "min  "
+        if maxr > 0
+            txt .= "Max: " maxr "min"
+        if !txt
+            txt := "No runtime limits"
+        global RuntimeLimitsText
+        RuntimeLimitsText.Value := txt
     } else if (SessionEnd) {
         elapsed := (SessionEnd - SessionStart) // 1000
         TimeText.Value := "Session: " (elapsed//60) "m " Mod(elapsed,60) "s"
@@ -255,11 +382,16 @@ SetCustomHotkeys(*) {
 }
 
 ToggleAutoClicker(*) {
-    global IsRunning
-    if IsRunning
+    global IsRunning, MinRuntimeSlider, SessionStart
+    if IsRunning {
+        elapsed := (A_TickCount - SessionStart) // 1000
+        minr := MinRuntimeSlider.Value * 60
+        if minr > 0 && elapsed < minr
+            return ; Don't allow stop before min runtime
         StopSession()
-    else
+    } else {
         StartSession()
+    }
 }
 
 CreateGui()
