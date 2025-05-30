@@ -261,7 +261,7 @@ ClickLoop() {
     ; Handle break logic
     global NextBreakTime
     if (NextBreakTime > 0) {
-        NextBreakTime -= delay // 1000
+        extBreakTime -= Floor(delay / 1000)
         if (NextBreakTime <= 0) {
             Sleep(RandomInt(5000, 15000)) ; Take a break for 5-15 seconds
             NextBreakTime := RandomInt(60, 180)
